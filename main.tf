@@ -1,42 +1,62 @@
+# provider section
+variable "access_key" {}
+variable "access_secret" {}
+
 provider "aws" {
   region     = "us-east-1"
-  access_key = "AKIAJTTSSUF2PB6HDCCA"
-  secret_key = "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"
-}
-
-variable "subnet_prefix" {
-  description = "cidr block for the subnet"
-
+  access_key = var.access_key
+  secret_key = var.access_secret
 }
 
 
+# VPC section
+# We have main VPC with two subnets
 
-resource "aws_vpc" "prod-vpc" {
-  cidr_block = "10.0.0.0/16"
+
+variable "subnet_prefix_prod" {
+  description = "cidr block for the prod subnet"
+}
+
+
+variable "subnet_prefix_dev" {
+  description = "cidr block for the dev subnet"
+}
+
+resource "aws_vpc" "main-vpc" {
+  cidr_block = "72.0.0.0/16"
   tags = {
-    Name = "production"
+    Name = "hangout-web"
   }
+}
+
+resource "aws_subnet" "subnet-0" {
+  vpc_id            = aws_vpc.main-vpc.id
+  cidr_block        = var.subnet_prefix_prod
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "hangout prod subnet"  }
 }
 
 resource "aws_subnet" "subnet-1" {
-  vpc_id            = aws_vpc.prod-vpc.id
-  cidr_block        = var.subnet_prefix[0].cidr_block
+  vpc_id            = aws_vpc.main-vpc.id
+  cidr_block        = var.subnet_prefix_dev
   availability_zone = "us-east-1a"
 
   tags = {
-    Name = var.subnet_prefix[0].name
-  }
+    Name = "hangout dev subnet"  }
 }
 
-resource "aws_subnet" "subnet-2" {
-  vpc_id            = aws_vpc.prod-vpc.id
-  cidr_block        = var.subnet_prefix[1].cidr_block
-  availability_zone = "us-east-1a"
-
-  tags = {
-    Name = var.subnet_prefix[1].name
-  }
-}
+#resource "aws_subnet" "subnet-2" {
+#  vpc_id            = aws_vpc.prod-vpc.id
+#  cidr_block        = var.subnet_prefix[1].cidr_block
+#  availability_zone = "us-east-1a"
+#
+#
+#  tags = {
+#    Name = var.subnet_prefix[1].name
+#  }
+#}
 
 
 
