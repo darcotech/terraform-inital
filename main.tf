@@ -17,7 +17,6 @@ variable "subnet_prefix_prod" {
   description = "cidr block for the prod subnet"
 }
 
-
 variable "subnet_prefix_dev" {
   description = "cidr block for the dev subnet"
 }
@@ -47,43 +46,9 @@ resource "aws_subnet" "subnet-1" {
     Name = "hangout dev subnet"  }
 }
 
-#resource "aws_subnet" "subnet-2" {
-#  vpc_id            = aws_vpc.prod-vpc.id
-#  cidr_block        = var.subnet_prefix[1].cidr_block
-#  availability_zone = "us-east-1a"
-#
-#
-#  tags = {
-#    Name = var.subnet_prefix[1].name
-#  }
-#}
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # 1. Create vpc
-
-# resource "aws_vpc" "prod-vpc" {
-#   cidr_block = "10.0.0.0/16"
-#   tags = {
-#     Name = "production"
-#   }
-# }
 
 # # 2. Create Internet Gateway
 
