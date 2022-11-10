@@ -46,36 +46,35 @@ resource "aws_subnet" "subnet-1" {
     Name = "hangout dev subnet"  }
 }
 
+# # Create Internet Gateway
+
+resource "aws_internet_gateway" "gw" {
+   vpc_id = aws_vpc.main-vpc.id
+
+
+}
 
 
 
+# # Create specific Route Table
 
-# # 2. Create Internet Gateway
+resource "aws_route_table" "prod-route-table" {
+   vpc_id = aws_vpc.main-vpc.id
 
-# resource "aws_internet_gateway" "gw" {
-#   vpc_id = aws_vpc.prod-vpc.id
+   route {
+     cidr_block = "0.0.0.0/0"
+     gateway_id = aws_internet_gateway.gw.id
+   }
 
+   route {
+     ipv6_cidr_block = "::/0"
+     gateway_id      = aws_internet_gateway.gw.id
+  }
 
-# }
-# # 3. Create Custom Route Table
-
-# resource "aws_route_table" "prod-route-table" {
-#   vpc_id = aws_vpc.prod-vpc.id
-
-#   route {
-#     cidr_block = "0.0.0.0/0"
-#     gateway_id = aws_internet_gateway.gw.id
-#   }
-
-#   route {
-#     ipv6_cidr_block = "::/0"
-#     gateway_id      = aws_internet_gateway.gw.id
-#   }
-
-#   tags = {
-#     Name = "Prod"
-#   }
-# }
+   tags = {
+     Name = "Prod"
+   }
+ }
 
 # # 4. Create a Subnet 
 
@@ -89,50 +88,61 @@ resource "aws_subnet" "subnet-1" {
 #   }
 # }
 
-# # 5. Associate subnet with Route Table
-# resource "aws_route_table_association" "a" {
-#   subnet_id      = aws_subnet.subnet-1.id
-#   route_table_id = aws_route_table.prod-route-table.id
-# }
-# # 6. Create Security Group to allow port 22,80,443
-# resource "aws_security_group" "allow_web" {
-#   name        = "allow_web_traffic"
-#   description = "Allow Web inbound traffic"
-#   vpc_id      = aws_vpc.prod-vpc.id
+# # Associate subnet with Route Table
+resource "aws_route_table_association" "a" {
+   subnet_id      = aws_subnet.subnet-0.id
+   route_table_id = aws_route_table.prod-route-table.id
+ }
 
-#   ingress {
-#     description = "HTTPS"
-#     from_port   = 443
-#     to_port     = 443
-#     protocol    = "tcp"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
-#   ingress {
-#     description = "HTTP"
-#     from_port   = 80
-#     to_port     = 80
-#     protocol    = "tcp"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
-#   ingress {
-#     description = "SSH"
-#     from_port   = 22
-#     to_port     = 22
-#     protocol    = "tcp"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
 
-#   egress {
-#     from_port   = 0
-#     to_port     = 0
-#     protocol    = "-1"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
+# # Create Security Group to allow port 22,80,443
+resource "aws_security_group" "allow_web" {
+   name        = "allow_web_traffic"
+   description = "Allow Web inbound traffic"
+   vpc_id      = aws_vpc.main-vpc.id
 
-#   tags = {
-#     Name = "allow_web"
-#   }
-# }
+   ingress {
+     description = "HTTPS"
+     from_port   = 443
+     to_port     = 443
+     protocol    = "tcp"
+     cidr_blocks = ["0.0.0.0/0"]
+   }
+   ingress {
+     description = "HTTP"
+     from_port   = 80
+     to_port     = 80
+     protocol    = "tcp"
+     cidr_blocks = ["0.0.0.0/0"]
+   }
+
+    ingress {
+     description = "HTTP-Jen"
+     from_port   = 8080
+     to_port     = 8080
+     protocol    = "tcp"
+     cidr_blocks = ["0.0.0.0/0"]
+   }
+
+   ingress {
+     description = "SSH"
+     from_port   = 22
+     to_port     = 22
+     protocol    = "tcp"
+     cidr_blocks = ["0.0.0.0/0"]
+   }
+
+   egress {
+     from_port   = 0
+     to_port     = 0
+     protocol    = "-1"
+     cidr_blocks = ["0.0.0.0/0"]
+   }
+
+   tags = {
+     Name = "allow_web"
+   }
+ }
 
 # # 7. Create a network interface with an ip in the subnet that was created in step 4
 
@@ -157,12 +167,79 @@ resource "aws_subnet" "subnet-1" {
 
 # # 9. Create Ubuntu server and install/enable apache2
 
-# resource "aws_instance" "web-server-instance" {
-#   ami               = "ami-085925f297f89fce1"
-#   instance_type     = "t2.micro"
-#   availability_zone = "us-east-1a"
-#   key_name          = "main-key"
+variable "public_key" {}
 
+resource "aws_key_pair" "deployer" {
+  key_name   = "deployer"
+  public_key = var.public_key
+  }
+
+
+
+resource "aws_instance" "ubuntu" {
+  ami           = "ami-04505e74c0741db8d"
+  instance_type = "t2.micro"
+  key_name      = aws_key_pair.deployer.key_name
+  vpc_security_group_ids = aws_security_group.allow_web.id
+  tags = {
+    "Name" = "jenkins-m"
+    "ENV"  = "Dev"
+  }
+
+# Type of connection to be established
+  
+  connection {
+    type        = "ssh"
+    user        = "ubuntu"
+    private_key = var.public_key
+    host        = self.public_ip
+  }
+depends_on = [aws_key_pair.deployer]
+
+  # Remotely execute commands to install Java, Python, Jenkins
+  provisioner "remote-exec" {
+    inline = [
+      "sudo apt update && upgrade",
+      "sudo apt install -y python3.8",
+      "wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -",
+      "sudo sh -c 'echo deb http://pkg.jenkins.io/debian-stable binary/ >  /etc/apt/sources.list.d/jenkins.list'",
+      "sudo apt-get update",
+      "sudo apt-get install -y openjdk-8-jre",
+      "sudo apt-get install -y jenkins",
+    ]
+  }
+
+
+}
+  
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+resource "aws_instance" "jenkins-m" {
+   ami               = "ami-08c40ec9ead489470"
+   instance_type     = "t2.micro"
+   availability_zone = "us-east-1a"
+   key_name          = "main-key"
+}
 #   network_interface {
 #     device_index         = 0
 #     network_interface_id = aws_network_interface.web-server-nic.id
